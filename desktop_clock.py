@@ -7,10 +7,14 @@ import requests
 from lunar_python import Lunar
 import os
 import math
+import sys
 
 # 修复 tkinter 找不到 tcl/tk 库的问题
 os.environ['TCL_LIBRARY'] = r"C:\Users\Administrator\AppData\Local\Programs\Python\Python313\tcl\tcl8.6"
 os.environ['TK_LIBRARY'] = r"C:\Users\Administrator\AppData\Local\Programs\Python\Python313\tcl\tk8.6"
+
+# 添加插件目录到路径
+sys.path.append(os.path.join(os.path.dirname(__file__), 'plugins'))
 
 class DesktopClock:
     def __init__(self, root):
@@ -30,6 +34,9 @@ class DesktopClock:
         self.tz2_var = tk.StringVar(value="UTC")
         self.alpha_var = tk.DoubleVar(value=1.0)
         
+        # 初始化插件系统
+        self.init_plugins()
+        
         # 界面初始化
         self.setup_ui()
         
@@ -43,6 +50,17 @@ class DesktopClock:
         
         # 启动时间更新
         self.update_time()
+    
+    def init_plugins(self):
+        """初始化插件系统"""
+        try:
+            from plugins.plugin_manager import PluginManager
+            self.plugin_manager = PluginManager(self)
+            self.plugin_manager.load_plugins()
+            print("Plugins loaded successfully!")
+        except Exception as e:
+            print(f"Failed to load plugins: {e}")
+            self.plugin_manager = None
 
     def setup_ui(self):
         # 自定义标题栏 (用于拖动)
@@ -55,6 +73,10 @@ class DesktopClock:
         # 关闭按钮
         self.close_btn = tk.Button(self.title_bar, text="✕", bg="#E74C3C", fg="white", bd=0, width=4, command=self.root.quit)
         self.close_btn.pack(side=tk.RIGHT, fill=tk.Y)
+        
+        # 插件管理按钮
+        self.plugin_btn = tk.Button(self.title_bar, text="插件", bg="#5BB5E0", fg="white", bd=0, padx=10, command=self.show_plugins)
+        self.plugin_btn.pack(side=tk.RIGHT, fill=tk.Y, padx=2)
         
         # 切换模式按钮
         self.toggle_btn = tk.Button(self.title_bar, text="精简模式", bg="#5BB5E0", fg="white", bd=0, padx=10, command=self.toggle_mode)
@@ -214,6 +236,16 @@ class DesktopClock:
                 if res.status_code == 200:
                     weather_text = res.text.strip()
                     self.root.after(0, lambda: label.config(text=f"天气: {weather_text}"))
+                    # 通知插件天气更新
+                    if self.plugin_manager:
+                        try:
+                            self.plugin_manager.trigger_weather_update({
+                                'city': city,
+                                'weather': weather_text,
+                                'tz_index': tz_index
+                            })
+                        except Exception as e:
+                            print(f"Error triggering plugin weather update: {e}")
                 else:
                     self.root.after(0, lambda: label.config(text="天气获取失败"))
             except Exception:
@@ -290,9 +322,67 @@ class DesktopClock:
             self.date2_label.config(text="--")
             self.time2_label.config(text="无效时区")
             self.lunar2_label.config(text="--")
+        
+        # 通知插件时间更新
+        if self.plugin_manager:
+            try:
+                self.plugin_manager.trigger_time_update(datetime.now())
+            except Exception as e:
+                print(f"Error triggering plugin time update: {e}")
             
         # 每 1000 毫秒（1 秒）更新一次
         self.root.after(1000, self.update_time)
+    
+    def show_plugins(self):
+        """显示插件管理窗口"""
+        plugin_window = tk.Toplevel(self.root)
+        plugin_window.title("插件管理")
+        plugin_window.geometry("400x300")
+        plugin_window.attributes("-topmost", True)
+        
+        # 插件列表框架
+        frame = ttk.Frame(plugin_window, padding=10)
+        frame.pack(fill=tk.BOTH, expand=True)
+        
+        ttk.Label(frame, text="已加载插件", font=("Microsoft YaHei", 12, "bold")).pack(pady=(0, 10))
+        
+        if self.plugin_manager:
+            plugins = self.plugin_manager.get_plugins()
+            
+            if plugins:
+                for i, plugin in enumerate(plugins):
+                    plugin_frame = tk.Frame(frame, bg="#f0f0f0", relief=tk.RIDGE, bd=1)
+                    plugin_frame.pack(fill=tk.X, pady=5)
+                    
+                    info_frame = ttk.Frame(plugin_frame, padding=8)
+                    info_frame.pack(fill=tk.X)
+                    
+                    ttk.Label(info_frame, text=f"插件 {i+1}: {plugin.get_name()}", 
+                              font=("Microsoft YaHei", 10, "bold")).pack(anchor=tk.W)
+                    ttk.Label(info_frame, text=f"版本: {plugin.get_version()}").pack(anchor=tk.W)
+                    ttk.Label(info_frame, text=f"作者: {plugin.get_author()}").pack(anchor=tk.W)
+                    ttk.Label(info_frame, text=f"描述: {plugin.get_description()}").pack(anchor=tk.W)
+                    
+                    # 尝试获取插件功能信息
+                    if hasattr(plugin, 'get_air_quality'):
+                        try:
+                            ttk.Label(info_frame, text=f"空气质量: {plugin.get_air_quality()}").pack(anchor=tk.W)
+                        except:
+                            pass
+                    if hasattr(plugin, 'get_forecast'):
+                        try:
+                            forecast = plugin.get_forecast()
+                            if forecast:
+                                ttk.Label(info_frame, text=f"预报: {', '.join(forecast[:2])}...").pack(anchor=tk.W)
+                        except:
+                            pass
+            else:
+                ttk.Label(frame, text="暂无已加载的插件").pack()
+        else:
+            ttk.Label(frame, text="插件系统未初始化").pack()
+        
+        # 关闭按钮
+        ttk.Button(frame, text="关闭", command=plugin_window.destroy).pack(pady=10)
 
 if __name__ == "__main__":
     root = tk.Tk()
