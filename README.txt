@@ -2,7 +2,7 @@
          Desktop Clock 桌面时钟
 =====================================
 
-一个功能丰富的桌面时钟应用，支持双时区显示、农历日历、天气信息等功能。
+一个功能丰富的桌面时钟应用，支持双时区显示、农历日历、天气信息和插件系统。
 
 功能特性
 ========
@@ -26,7 +26,13 @@
    - 支持窗口拖动
    - 置顶显示
 
-5. 界面设计
+5. 插件系统
+   - 支持第三方插件扩展
+   - 动态加载插件
+   - 插件管理界面
+   - 支持时间和天气事件通知
+
+6. 界面设计
    - 天蓝色标题栏
    - 简洁美观的界面布局
 
@@ -69,12 +75,51 @@
 
 5. 关闭窗口：点击右上角的关闭按钮
 
+6. 插件管理：点击"插件"按钮查看已加载的插件
+
+插件系统
+========
+
+插件目录结构：
+   plugins/
+   ├── plugin_base.py        # 插件基类
+   ├── plugin_manager.py     # 插件管理器
+   └── example_plugins/      # 示例插件目录
+
+创建自定义插件：
+1. 在 plugins/example_plugins/ 目录创建新的 .py 文件
+2. 继承 Plugin 基类
+3. 实现需要的方法（initialize, on_time_update, on_weather_update 等）
+
+示例插件代码：
+from plugins.plugin_base import Plugin
+
+class MyPlugin(Plugin):
+    def __init__(self):
+        self.name = "My Plugin"
+        self.version = "1.0.0"
+        self.description = "我的自定义插件"
+    
+    def on_time_update(self, current_time):
+        # 时间更新时触发
+        pass
+    
+    def on_weather_update(self, weather_data):
+        # 天气更新时触发
+        pass
+
 文件结构
 ========
 
-├── desktop_clock.py    # 主程序文件
-├── venv/              # Python虚拟环境
-└── README.txt         # 说明文档
+├── desktop_clock.py        # 主程序文件
+├── plugins/                # 插件目录
+│   ├── plugin_base.py      # 插件基类
+│   ├── plugin_manager.py   # 插件管理器
+│   └── example_plugins/    # 示例插件
+│       ├── world_clock_plugin.py
+│       └── weather_plugin.py
+├── venv/                   # Python虚拟环境
+└── README.txt              # 说明文档
 
 技术栈
 ======
@@ -96,11 +141,12 @@
 1. 需要网络连接才能获取天气信息
 2. 默认显示亚洲/上海时区和UTC时区
 3. 程序启动后会自动置顶显示
+4. 插件会在程序启动时自动加载
 
 版本
 ====
 
-v1.0.0
+v1.1.0 - 添加插件系统
 
 作者
 ====
